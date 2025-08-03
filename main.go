@@ -46,12 +46,12 @@ func main() {
 		v1.GET("/subscribers/:id", v1Handler.GetSubscriber)
 	}
 
-	// V2 Routes - Middleware Magic (isolated middleware!)
+	// V2 Routes - Middleware Magic
 	v2Handler := handlers.NewV2Handler(memStore)
 	
-	// Create V2 group with isolated middleware
+	// Create V2 group with OpenTelemetry middleware
 	v2 := router.Group("/v2")
-	v2.Use(otelgin.Middleware("telemetry-demo"))  // Only applies to V2 routes!
+	v2.Use(otelgin.Middleware("telemetry-demo"))  // Automatic HTTP tracing for V2 only
 	{
 		v2.POST("/subscribers", v2Handler.CreateSubscriber)
 		v2.GET("/subscribers", v2Handler.GetSubscribers) 

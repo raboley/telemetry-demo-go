@@ -397,18 +397,33 @@ The `otelgin.Middleware` automatically captures:
 - ✅ **Error states**
 - ✅ **Standard OpenTelemetry semantic conventions**
 
-### Isolated Middleware
-V2 uses a **separate router** with middleware:
+### How Middleware Works
+V2 uses **Gin route groups** with OpenTelemetry middleware:
+
 ```go
-// V2 router with middleware (isolated!)
-v2Router := routes.CreateV2Router(memStore)
-v2Router.Use(otelgin.Middleware("telemetry-demo"))
+// Create route group for V2 endpoints
+v2 := router.Group("/v2")
+
+// Apply middleware ONLY to this group
+v2.Use(otelgin.Middleware("telemetry-demo"))
+
+// All routes in this group get automatic tracing
+{
+    v2.POST("/subscribers", v2Handler.CreateSubscriber)  // Auto-traced!
+    v2.GET("/subscribers", v2Handler.GetSubscribers)     // Auto-traced!
+    v2.GET("/subscribers/:id", v2Handler.GetSubscriber)  // Auto-traced!
+}
 ```
 
-**Isolation Benefits:**
-- V0/V1 completely unaffected by middleware
-- Can mix instrumentation approaches in same app
-- Perfect for gradual migration strategies
+**How the middleware works:**
+1. **Request comes in** → `POST /v2/subscribers`
+2. **Middleware runs first** → Creates span automatically with HTTP details
+3. **Handler executes** → Gets the pre-created span via `trace.SpanFromContext()`
+4. **Middleware finishes** → Closes span with final HTTP status code
+
+**Middleware vs Manual:**
+- **V0/V1 routes**: No middleware → No automatic spans
+- **V2 routes**: Middleware enabled → Automatic HTTP spans + custom business spans
 
 ### Business Logic Focus
 V2 handlers focus on **business logic only:**
