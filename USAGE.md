@@ -15,6 +15,12 @@
 
 ## V0 - Basic Logging Demo
 
+### Start the Application
+```bash
+go mod tidy
+go run main.go
+```
+
 ### Sample API Calls
 
 **Create a subscriber:**
@@ -81,17 +87,25 @@ Each log entry includes:
 ## V1 - Manual Tracing Demo
 
 ### Prerequisites
-First, start Jaeger to collect traces:
+Start both Zipkin and Jaeger to collect traces (run each in separate terminals):
 ```bash
-# Run Jaeger in Docker
+docker run -d --name zipkin -p 9411:9411 openzipkin/zipkin
+```
+
+```bash
 docker run -d --name jaeger \
   -p 16686:16686 \
   -p 14268:14268 \
   jaegertracing/all-in-one:latest
-
-# Or use the official Jaeger binary
-# Download from: https://www.jaegertracing.io/download/
 ```
+
+### Start the Application
+```bash
+go mod tidy
+go run main.go
+```
+
+
 
 ### Sample API Calls
 
@@ -134,10 +148,17 @@ curl -X POST http://localhost:8080/v1/subscribers \
 - **Same clean format**: Still focused on business data
 - **Distributed context**: Trace IDs connect related operations
 
-### Jaeger UI (http://localhost:16686)
-1. **Service**: Select "telemetry-demo" 
+### View Traces in Both UIs
+
+**Zipkin UI (http://localhost:9411)**
+1. **Service Name**: Select "telemetry-demo" from dropdown
+2. **Operation Name**: Choose operations like "create_subscriber_request"  
+3. **Run Query**: Click "RUN QUERY" to find traces
+
+**Jaeger UI (http://localhost:16686)**
+1. **Service**: Select "telemetry-demo" from dropdown
 2. **Operation**: Choose operations like "create_subscriber_request"
-3. **Find Traces**: Click "Find Traces"
+3. **Find Traces**: Click "Find Traces" button
 
 ### Trace Structure
 Each request creates a **trace** with multiple **spans**:
@@ -168,6 +189,30 @@ get_subscriber_request (root span)
 3. **Attributes**: Business data attached to spans
 4. **Status Codes**: Success/error states in spans
 5. **Span Relationships**: Parent-child hierarchy shows request flow
+
+### Compare Zipkin vs Jaeger UIs
+**Same traces, different experiences:**
+
+**Zipkin strengths:**
+- **Cleaner UI**: More intuitive trace visualization
+- **Better UX**: Easier navigation and filtering  
+- **Dependency graphs**: Clear service interaction maps
+- **Timeline view**: Excellent span timing visualization
+
+**Jaeger strengths:**
+- **Detailed metadata**: More comprehensive span details
+- **System architecture**: Better service dependency view
+- **Search capabilities**: Advanced filtering options
+- **Industry standard**: Widely adopted in enterprises
+
+### Stop Both telemetry clients Services (when done)
+```bash
+docker stop jaeger && docker rm jaeger
+```
+
+```shell
+docker stop zipkin && docker rm zipkin
+```
 
 ---
 
