@@ -311,4 +311,134 @@ if err != nil {
 - **Standard conventions** - OpenTelemetry HTTP semantic conventions
 - **Zero boilerplate** - Just add middleware, everything works
 
+---
+
+## V2 - Middleware Magic ✨
+
+### Same Prerequisites 
+```bash
+docker run -d --name zipkin -p 9411:9411 openzipkin/zipkin
+```
+
+```bash
+docker run -d --name jaeger \
+  -p 16686:16686 \
+  -p 14268:14268 \
+  jaegertracing/all-in-one:latest
+```
+
+### Start the Application
+```bash
+go mod tidy
+go run main.go
+```
+
+### Sample API Calls
+
+**Create subscribers with automatic tracing:**
+```bash
+curl -X POST http://localhost:8080/v2/subscribers \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Charlie Brown", "email": "charlie@example.com"}'
+
+curl -X POST http://localhost:8080/v2/subscribers \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Lucy Van Pelt", "email": "lucy@example.com"}'
+```
+
+**Get all subscribers:**
+```bash
+curl http://localhost:8080/v2/subscribers
+```
+
+**Get specific subscriber:**
+```bash
+curl http://localhost:8080/v2/subscribers/1
+```
+
+**Test error scenarios:**
+```bash
+# Invalid ID
+curl http://localhost:8080/v2/subscribers/999
+
+# Invalid JSON
+curl -X POST http://localhost:8080/v2/subscribers \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Missing Email"}'
+```
+
+## What V2 Demonstrates
+
+### Clean Handler Code
+Compare V2 vs V1 - same functionality, much cleaner:
+
+**V1 (Manual):**
+```go
+// 15+ lines of tracing boilerplate per endpoint
+ctx, span := h.tracer.Start(c.Request.Context(), "create_subscriber_request")
+defer span.End()
+span.SetAttributes(attribute.String("http.method", "POST"))
+// ... more setup code
+```
+
+**V2 (Middleware):**
+```go
+// Just get the span that middleware created!
+span := trace.SpanFromContext(c.Request.Context())
+// Add business context only
+span.SetAttributes(attribute.String("user.name", req.Name))
+```
+
+### Automatic HTTP Instrumentation
+The `otelgin.Middleware` automatically captures:
+- ✅ **HTTP method, route, status code**
+- ✅ **Request/response headers** 
+- ✅ **Request duration**
+- ✅ **Error states**
+- ✅ **Standard OpenTelemetry semantic conventions**
+
+### Isolated Middleware
+V2 uses a **separate router** with middleware:
+```go
+// V2 router with middleware (isolated!)
+v2Router := routes.CreateV2Router(memStore)
+v2Router.Use(otelgin.Middleware("telemetry-demo"))
+```
+
+**Isolation Benefits:**
+- V0/V1 completely unaffected by middleware
+- Can mix instrumentation approaches in same app
+- Perfect for gradual migration strategies
+
+### Business Logic Focus
+V2 handlers focus on **business logic only:**
+- HTTP context handled by middleware
+- Custom spans only for business operations  
+- Cleaner, more maintainable code
+- Easy to read and understand
+
+### Same Rich Observability
+Despite cleaner code, V2 provides **richer traces**:
+- All V1 custom spans + automatic HTTP instrumentation
+- Standard semantic conventions for better tooling
+- Consistent span naming across all endpoints
+
+---
+
+## V0 vs V1 vs V2 Comparison
+
+| Aspect | V0 | V1 | V2 |
+|--------|----|----|----| 
+| **Observability** | Logs only | Manual traces | Auto + custom traces |
+| **Code cleanliness** | ✅ Clean | ❌ Lots of boilerplate | ✅ Clean |
+| **HTTP context** | ❌ Manual | ❌ Manual | ✅ Automatic |
+| **Business spans** | ❌ None | ✅ Full control | ✅ When needed |
+| **Standard conventions** | ❌ None | ❌ Manual | ✅ Built-in |
+| **Maintenance** | ✅ Easy | ❌ High overhead | ✅ Easy |
+
+**The Evolution:**
+- **V0**: Understanding the basics
+- **V1**: Learning how tracing works under the hood  
+- **V2**: Production-ready observability with minimal effort
+
 Each version builds on the previous, showing the evolution of observability!
