@@ -76,10 +76,104 @@ Each log entry includes:
 - `WARN`: Not found scenarios
 - `ERROR`: Validation or processing errors
 
+---
+
+## V1 - Manual Tracing Demo
+
+### Prerequisites
+First, start Jaeger to collect traces:
+```bash
+# Run Jaeger in Docker
+docker run -d --name jaeger \
+  -p 16686:16686 \
+  -p 14268:14268 \
+  jaegertracing/all-in-one:latest
+
+# Or use the official Jaeger binary
+# Download from: https://www.jaegertracing.io/download/
+```
+
+### Sample API Calls
+
+**Create subscribers with tracing:**
+```bash
+curl -X POST http://localhost:8080/v1/subscribers \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Alice Johnson", "email": "alice@example.com"}'
+
+curl -X POST http://localhost:8080/v1/subscribers \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Bob Wilson", "email": "bob@example.com"}'
+```
+
+**Get all subscribers:**
+```bash
+curl http://localhost:8080/v1/subscribers
+```
+
+**Get specific subscriber:**
+```bash
+curl http://localhost:8080/v1/subscribers/1
+```
+
+**Test error scenarios:**
+```bash
+# Invalid ID
+curl http://localhost:8080/v1/subscribers/999
+
+# Invalid JSON
+curl -X POST http://localhost:8080/v1/subscribers \
+  -H "Content-Type: application/json" \
+  -d '{"name": "No Email Here"}'
+```
+
+## What to Observe in V1
+
+### Console Logs
+- **Trace IDs**: Every log now includes `trace_id` and `span_id`
+- **Same clean format**: Still focused on business data
+- **Distributed context**: Trace IDs connect related operations
+
+### Jaeger UI (http://localhost:16686)
+1. **Service**: Select "telemetry-demo" 
+2. **Operation**: Choose operations like "create_subscriber_request"
+3. **Find Traces**: Click "Find Traces"
+
+### Trace Structure
+Each request creates a **trace** with multiple **spans**:
+
+**Create Subscriber Trace:**
+```
+create_subscriber_request (root span)
+├── validate_subscriber_data (child span)
+└── store_subscriber (child span)
+```
+
+**Get Subscriber Trace:**
+```
+get_subscriber_request (root span)
+├── parse_subscriber_id (child span)
+└── lookup_subscriber (child span)
+```
+
+### Manual Tracing Benefits
+- **Explicit control**: You decide what to trace
+- **Rich context**: Custom attributes for business logic
+- **Error tracking**: Spans capture error states
+- **Performance insights**: Child spans show breakdown timing
+
+### Key V1 Concepts Demonstrated
+1. **Span Creation**: `tracer.Start()` creates parent/child relationships
+2. **Context Propagation**: `ctx` parameter carries trace context
+3. **Attributes**: Business data attached to spans
+4. **Status Codes**: Success/error states in spans
+5. **Span Relationships**: Parent-child hierarchy shows request flow
+
+---
+
 ## Next Steps
 
-After exploring V0, you'll implement:
-- **V1**: Manual tracing and spans
-- **V2**: OpenTelemetry middleware magic
+After exploring V1, you'll implement:
+- **V2**: OpenTelemetry middleware magic (automatic instrumentation)
 
 Each version builds on the previous, showing the evolution of observability!
