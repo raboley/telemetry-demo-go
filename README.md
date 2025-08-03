@@ -130,21 +130,48 @@ The server starts on `http://localhost:8080`
 
 ### Example API Usage
 
-**Create a subscriber:**
+**Create a subscriber and capture the ID:**
 ```bash
-curl -X POST http://localhost:8080/api/v1/subscribers \
+# Create subscriber and extract the ID for subsequent calls
+USER_ID=$(curl -X POST http://localhost:8080/api/v1/subscribers \
   -H "Content-Type: application/json" \
-  -d '{"email": "john@example.com", "name": "John Doe"}'
+  -d '{"email": "john@example.com", "name": "John Doe"}' \
+  -s | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
+
+echo "Created user with ID: $USER_ID"
 ```
 
 **Get subscriber (first call - cache miss):**
 ```bash
-curl http://localhost:8080/api/v1/subscribers/{id}
+curl http://localhost:8080/api/v1/subscribers/$USER_ID
 ```
 
 **Get subscriber again (cache hit):**
 ```bash
-curl http://localhost:8080/api/v1/subscribers/{id}
+curl http://localhost:8080/api/v1/subscribers/$USER_ID
+```
+
+**Complete workflow (copy and paste to run all at once):**
+```bash
+# Start with a clean slate - create subscriber and capture ID
+USER_ID=$(curl -X POST http://localhost:8080/api/v1/subscribers \
+  -H "Content-Type: application/json" \
+  -d '{"email": "demo@example.com", "name": "Demo User"}' \
+  -s | grep -o '"id":"[^"]*"' | cut -d'"' -f4)
+
+echo "Created user with ID: $USER_ID"
+
+# First GET - cache miss (will hit database)
+echo "First GET (cache miss):"
+curl http://localhost:8080/api/v1/subscribers/$USER_ID
+
+# Second GET - cache hit (no database access)
+echo -e "\nSecond GET (cache hit):"
+curl http://localhost:8080/api/v1/subscribers/$USER_ID
+
+# List all subscribers
+echo -e "\nList all subscribers:"
+curl http://localhost:8080/api/v1/subscribers
 ```
 
 ## 🧪 Testing Observability
@@ -157,37 +184,36 @@ go test ./test -v
 
 ### Test Strategy
 
-The black box tests verify observability behavior:
+Each test spawns a fresh application instance to ensure isolation. The tests verify:
 
-1. **Cache Miss Test:** Verifies database spans are present when cache misses
-2. **Cache Hit Test:** Verifies database spans are ABSENT when cache hits
-3. **Span Attributes Test:** Verifies proper metadata in spans
+1. **TestSubscriberCreation:** Verifies subscriber creation and database/cache write spans
+2. **TestSubscriberCacheMiss:** Verifies database spans are present when cache is cleared
+3. **TestSubscriberCacheHit:** Verifies database spans are ABSENT when cache hits
+4. **TestSpanAttributes:** Verifies proper metadata in spans
 
-### Key Test: Cache vs Database Spans
+### Key Test: Cache Hit vs Cache Miss
 
 ```go
-// This test verifies that:
-// 1. First request: cache miss → database span present
-// 2. Second request: cache hit → NO database span
-func TestSubscriberCacheSpanVerification(t *testing.T) {
-    // Create subscriber
-    subscriber := app.CreateSubscriber(t, "test@example.com", "Test User")
-    
-    // Clear spans to start fresh
+// TestSubscriberCacheHit: Verifies NO database access on cache hit
+func TestSubscriberCacheHit(t *testing.T) {
+    app := SpawnTestApp(t)  // Fresh app instance
+    defer app.Close()
+
+    subscriber := app.CreateSubscriber(t, "cachehit@example.com", "Cache Hit User")
     app.ClearSpans()
-    
-    // First GET - should hit database (cache miss)
+
+    // First GET - populates cache
     _ = app.GetSubscriber(t, subscriber.ID.String())
-    databaseSpans := app.GetSpansByOperation("database.read")
-    assert.GreaterOrEqual(t, len(databaseSpans), 1) // Database accessed!
-    
-    // Clear spans again
     app.ClearSpans()
-    
-    // Second GET - should hit cache (no database)
+
+    // Second GET - should hit cache only
     _ = app.GetSubscriber(t, subscriber.ID.String())
-    databaseSpans = app.GetSpansByOperation("database.read")
-    assert.Equal(t, 0, len(databaseSpans)) // NO database access!
+
+    databaseReadSpans := app.GetSpansByOperation("database.read")
+    cacheReadSpans := app.GetSpansByOperation("cache.read")
+
+    assert.Equal(t, 0, len(databaseReadSpans))        // NO database access!
+    assert.GreaterOrEqual(t, len(cacheReadSpans), 1)  // Cache accessed!
 }
 ```
 

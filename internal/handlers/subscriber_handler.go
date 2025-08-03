@@ -30,7 +30,9 @@ func NewSubscriberHandler(service *service.SubscriberService, logger *logging.Co
 }
 
 func (h *SubscriberHandler) CreateSubscriber(c *gin.Context) {
+	// This will start a span manually using the request context.
 	ctx, span := h.tracer.Start(c.Request.Context(), "subscriber.handler.create")
+	// defer here will automatically close the span
 	defer span.End()
 
 	var req models.CreateSubscriberRequest
