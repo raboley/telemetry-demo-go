@@ -1,10 +1,13 @@
 package models
 
 import (
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+var ErrSubscriberNotFound = errors.New("subscriber not found")
 
 type Subscriber struct {
 	ID          uuid.UUID `json:"id"`

@@ -164,3 +164,7 @@ func (c *InMemoryCache) cleanup() {
 func GenerateCacheKey(id uuid.UUID) string {
 	return fmt.Sprintf("subscriber:%s", id.String())
 }
+
+func GenerateCacheKeyFromString(id string) string {
+	return fmt.Sprintf("subscriber:%s", id)
+}

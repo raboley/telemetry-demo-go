@@ -1,0 +1,16 @@
+apiVersion: dapr.io/v1alpha1
+kind: Configuration
+metadata:
+  name: daprConfig
+spec:
+  tracing:
+    samplingRate: "1"
+    otel:
+      endpointAddress: "http://localhost:4317"
+  metric:
+    enabled: true
+  api:
+    allowed:
+      - name: state
+        version: v1
+        protocol: http

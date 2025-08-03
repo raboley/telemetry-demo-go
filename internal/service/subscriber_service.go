@@ -4,7 +4,6 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/sirupsen/logrus"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
@@ -77,21 +76,21 @@ func (s *SubscriberService) CreateSubscriber(ctx context.Context, req *models.Cr
 	return subscriber, nil
 }
 
-func (s *SubscriberService) GetSubscriber(ctx context.Context, id uuid.UUID) (*models.Subscriber, error) {
+func (s *SubscriberService) GetSubscriber(ctx context.Context, id string) (*models.Subscriber, error) {
 	ctx, span := s.tracer.Start(ctx, "subscriber.service.get",
 		trace.WithAttributes(
-			attribute.String("subscriber.id", id.String()),
+			attribute.String("subscriber.id", id),
 		))
 	defer span.End()
 
 	s.logger.InfoWithTracing(ctx, "Retrieving subscriber", logrus.Fields{
-		"subscriber_id": id.String(),
+		"subscriber_id": id,
 	})
 
-	cacheKey := cache.GenerateCacheKey(id)
+	cacheKey := cache.GenerateCacheKeyFromString(id)
 	if subscriber, err := s.cache.Get(ctx, cacheKey); err == nil {
 		s.logger.InfoWithTracing(ctx, "Subscriber found in cache", logrus.Fields{
-			"subscriber_id": id.String(),
+			"subscriber_id": id,
 		})
 		span.SetAttributes(
 			attribute.Bool("cache.hit", true),
@@ -101,13 +100,13 @@ func (s *SubscriberService) GetSubscriber(ctx context.Context, id uuid.UUID) (*m
 	}
 
 	s.logger.InfoWithTracing(ctx, "Subscriber not in cache, fetching from database", logrus.Fields{
-		"subscriber_id": id.String(),
+		"subscriber_id": id,
 	})
 
 	subscriber, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		s.logger.ErrorWithTracing(ctx, "Failed to retrieve subscriber", err, logrus.Fields{
-			"subscriber_id": id.String(),
+			"subscriber_id": id,
 		})
 		span.RecordError(err)
 		return nil, err
@@ -115,7 +114,7 @@ func (s *SubscriberService) GetSubscriber(ctx context.Context, id uuid.UUID) (*m
 
 	if err := s.cache.Set(ctx, cacheKey, subscriber, 5*time.Minute); err != nil {
 		s.logger.WarnWithTracing(ctx, "Failed to cache subscriber", logrus.Fields{
-			"subscriber_id": id.String(),
+			"subscriber_id": id,
 			"error":         err.Error(),
 		})
 	}
@@ -158,15 +157,15 @@ func (s *SubscriberService) GetAllSubscribers(ctx context.Context) ([]*models.Su
 	return subscribers, nil
 }
 
-func (s *SubscriberService) UpdateSubscriber(ctx context.Context, id uuid.UUID, req *models.CreateSubscriberRequest) (*models.Subscriber, error) {
+func (s *SubscriberService) UpdateSubscriber(ctx context.Context, id string, req *models.CreateSubscriberRequest) (*models.Subscriber, error) {
 	ctx, span := s.tracer.Start(ctx, "subscriber.service.update",
 		trace.WithAttributes(
-			attribute.String("subscriber.id", id.String()),
+			attribute.String("subscriber.id", id),
 		))
 	defer span.End()
 
 	s.logger.InfoWithTracing(ctx, "Updating subscriber", logrus.Fields{
-		"subscriber_id": id.String(),
+		"subscriber_id": id,
 		"email":         req.Email,
 		"name":          req.Name,
 	})
@@ -174,7 +173,7 @@ func (s *SubscriberService) UpdateSubscriber(ctx context.Context, id uuid.UUID, 
 	existing, err := s.repo.GetByID(ctx, id)
 	if err != nil {
 		s.logger.ErrorWithTracing(ctx, "Failed to find subscriber for update", err, logrus.Fields{
-			"subscriber_id": id.String(),
+			"subscriber_id": id,
 		})
 		span.RecordError(err)
 		return nil, err
@@ -186,16 +185,16 @@ func (s *SubscriberService) UpdateSubscriber(ctx context.Context, id uuid.UUID, 
 
 	if err := s.repo.Update(ctx, existing); err != nil {
 		s.logger.ErrorWithTracing(ctx, "Failed to update subscriber", err, logrus.Fields{
-			"subscriber_id": id.String(),
+			"subscriber_id": id,
 		})
 		span.RecordError(err)
 		return nil, err
 	}
 
-	cacheKey := cache.GenerateCacheKey(id)
+	cacheKey := cache.GenerateCacheKeyFromString(id)
 	if err := s.cache.Delete(ctx, cacheKey); err != nil {
 		s.logger.WarnWithTracing(ctx, "Failed to invalidate cache", logrus.Fields{
-			"subscriber_id": id.String(),
+			"subscriber_id": id,
 			"error":         err.Error(),
 		})
 	}
@@ -209,35 +208,35 @@ func (s *SubscriberService) UpdateSubscriber(ctx context.Context, id uuid.UUID, 
 	return existing, nil
 }
 
-func (s *SubscriberService) DeleteSubscriber(ctx context.Context, id uuid.UUID) error {
+func (s *SubscriberService) DeleteSubscriber(ctx context.Context, id string) error {
 	ctx, span := s.tracer.Start(ctx, "subscriber.service.delete",
 		trace.WithAttributes(
-			attribute.String("subscriber.id", id.String()),
+			attribute.String("subscriber.id", id),
 		))
 	defer span.End()
 
 	s.logger.InfoWithTracing(ctx, "Deleting subscriber", logrus.Fields{
-		"subscriber_id": id.String(),
+		"subscriber_id": id,
 	})
 
 	if err := s.repo.Delete(ctx, id); err != nil {
 		s.logger.ErrorWithTracing(ctx, "Failed to delete subscriber", err, logrus.Fields{
-			"subscriber_id": id.String(),
+			"subscriber_id": id,
 		})
 		span.RecordError(err)
 		return err
 	}
 
-	cacheKey := cache.GenerateCacheKey(id)
+	cacheKey := cache.GenerateCacheKeyFromString(id)
 	if err := s.cache.Delete(ctx, cacheKey); err != nil {
 		s.logger.WarnWithTracing(ctx, "Failed to remove from cache", logrus.Fields{
-			"subscriber_id": id.String(),
+			"subscriber_id": id,
 			"error":         err.Error(),
 		})
 	}
 
 	s.logger.InfoWithTracing(ctx, "Successfully deleted subscriber", logrus.Fields{
-		"subscriber_id": id.String(),
+		"subscriber_id": id,
 	})
 
 	span.SetAttributes(attribute.Bool("success", true))

@@ -23,13 +23,14 @@ type Config struct {
 	Logger         *logging.ContextLogger
 	TracerProvider trace.TracerProvider
 	GinMode        string
+	Repository     repository.SubscriberRepository // Allow injecting any repository implementation
 }
 
 type Application struct {
 	server  *http.Server
 	config  *Config
 	router  *gin.Engine
-	repo    *repository.InMemorySubscriberRepository
+	repo    repository.SubscriberRepository
 	cache   *cache.InMemoryCache
 	service *service.SubscriberService
 	handler *handlers.SubscriberHandler
@@ -40,7 +41,14 @@ func Build(config *Config) *Application {
 		gin.SetMode(config.GinMode)
 	}
 
-	repo := repository.NewInMemorySubscriberRepository()
+	// Use injected repository or fall back to in-memory
+	var repo repository.SubscriberRepository
+	if config.Repository != nil {
+		repo = config.Repository
+	} else {
+		repo = repository.NewInMemorySubscriberRepository()
+	}
+	
 	cacheInstance := cache.NewInMemoryCache()
 	subscriberService := service.NewSubscriberService(repo, cacheInstance, config.Logger)
 	subscriberHandler := handlers.NewSubscriberHandler(subscriberService, config.Logger)
@@ -117,7 +125,7 @@ func (app *Application) Shutdown(ctx context.Context) error {
 	return app.server.Shutdown(ctx)
 }
 
-func (app *Application) GetRepo() *repository.InMemorySubscriberRepository {
+func (app *Application) GetRepo() repository.SubscriberRepository {
 	return app.repo
 }
 

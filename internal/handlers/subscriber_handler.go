@@ -98,7 +98,7 @@ func (h *SubscriberHandler) GetSubscriber(c *gin.Context) {
 		"endpoint":      "GET /subscribers/:id",
 	})
 
-	subscriber, err := h.service.GetSubscriber(ctx, id)
+	subscriber, err := h.service.GetSubscriber(ctx, id.String())
 	if err != nil {
 		h.logger.ErrorWithTracing(ctx, "Failed to get subscriber", err, logrus.Fields{
 			"subscriber_id": id.String(),
@@ -189,7 +189,7 @@ func (h *SubscriberHandler) UpdateSubscriber(c *gin.Context) {
 		"endpoint":      "PUT /subscribers/:id",
 	})
 
-	subscriber, err := h.service.UpdateSubscriber(ctx, id, &req)
+	subscriber, err := h.service.UpdateSubscriber(ctx, id.String(), &req)
 	if err != nil {
 		h.logger.ErrorWithTracing(ctx, "Failed to update subscriber", err, logrus.Fields{
 			"subscriber_id": id.String(),
@@ -236,7 +236,7 @@ func (h *SubscriberHandler) DeleteSubscriber(c *gin.Context) {
 		"endpoint":      "DELETE /subscribers/:id",
 	})
 
-	err = h.service.DeleteSubscriber(ctx, id)
+	err = h.service.DeleteSubscriber(ctx, id.String())
 	if err != nil {
 		h.logger.ErrorWithTracing(ctx, "Failed to delete subscriber", err, logrus.Fields{
 			"subscriber_id": id.String(),

@@ -13,6 +13,7 @@ This example API is designed to teach observability concepts to development team
 
 ## 🏗️ Architecture
 
+### In-Memory Version
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │   HTTP Client   │───▶│   Gin Router    │───▶│    Handlers     │
@@ -29,6 +30,31 @@ This example API is designed to teach observability concepts to development team
                                               │   Repository    │
                                               │  (In-Memory)    │
                                               └─────────────────┘
+```
+
+### Dapr Version
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   HTTP Client   │───▶│   Gin Router    │───▶│    Handlers     │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                                                        │
+                                                        ▼
+                       ┌─────────────────┐    ┌─────────────────┐
+                       │     Cache       │◀───│    Service      │
+                       │  (In-Memory)    │    │     Layer       │
+                       └─────────────────┘    └─────────────────┘
+                                                        │
+                                                        ▼
+                                              ┌─────────────────┐
+                                              │ Dapr Repository │───┐
+                                              └─────────────────┘   │
+                                                        │           │
+                                                        ▼           ▼
+                                              ┌─────────────────┐   ┌─────────────────┐
+                                              │  Dapr Sidecar   │   │   Dapr State    │
+                                              │   (HTTP API)    │───│  Store (Redis/  │
+                                              └─────────────────┘   │ In-Memory/etc.) │
+                                                                    └─────────────────┘
 ```
 
 ## 📊 Observability Features
@@ -98,8 +124,9 @@ GET /subscribers/{id}
 
 ### Prerequisites
 
-- Go 1.21+
+- Go 1.23+
 - Git
+- [Dapr CLI](https://docs.dapr.io/getting-started/install-dapr-cli/) (for Dapr version)
 
 ### Setup
 
@@ -110,12 +137,23 @@ cd telemetry-go
 go mod tidy
 ```
 
-2. **Run the server:**
+### Running Options
+
+#### Option 1: In-Memory Version (Original)
 ```bash
 go run cmd/server/main.go
 ```
 
-The server starts on `http://localhost:8080`
+#### Option 2: Dapr Version (Distributed State Store)
+```bash
+# Initialize Dapr (first time only)
+dapr init
+
+# Run with Dapr
+dapr run --app-id subscriber-api --app-port 8080 --dapr-http-port 3500 --config .dapr/config.yaml --components-path .dapr/components -- go run cmd/dapr/main.go
+```
+
+Both versions start on `http://localhost:8080`
 
 ### Available Endpoints
 
@@ -342,19 +380,48 @@ func (l *ContextLogger) InfoWithTracing(ctx context.Context, msg string, fields 
 }
 ```
 
+## 🔧 Dapr Integration Features
+
+### State Store Operations
+The Dapr version demonstrates additional observability patterns:
+
+- **Distributed State Management:** Uses Dapr state store instead of in-memory storage
+- **External HTTP Calls:** Traces calls to Dapr sidecar API
+- **Configuration Management:** Shows how to configure Dapr components
+- **Service Discovery:** Demonstrates microservice communication patterns
+
+### Dapr Span Analysis
+When running the Dapr version, you'll see additional spans:
+```
+HTTP Request
+├── subscriber.handler.create (HTTP Handler)
+    ├── subscriber.service.create (Business Logic)
+        ├── subscriber.repository.create (Dapr Repository)
+            └── HTTP POST to Dapr Sidecar (External Service Call)
+        └── cache.set (Cache Write)
+```
+
+### Switching Between Implementations
+The application demonstrates the **Repository Pattern** with dependency injection:
+- **In-Memory:** `cmd/server/main.go` - Uses in-memory repository
+- **Dapr:** `cmd/dapr/main.go` - Uses Dapr state store repository
+- **Same Business Logic:** Both use identical service and handler layers
+
 ## 🚀 Next Steps
 
 To extend this example:
 
 1. **Add Metrics:** Implement Prometheus metrics for request counts, durations, error rates
-2. **External Services:** Add HTTP client calls with trace propagation
-3. **Database:** Replace in-memory storage with PostgreSQL/MySQL with database tracing
-4. **Message Queues:** Add async processing with trace context propagation
+2. **External Services:** Add HTTP client calls to other microservices with trace propagation
+3. **Real Database:** Replace Dapr in-memory state store with Redis/PostgreSQL
+4. **Message Queues:** Add async processing with Dapr pub/sub and trace context propagation
 5. **Error Handling:** Implement comprehensive error tracking and alerting
 
 ## 📚 Resources
 
 - [OpenTelemetry Go SDK](https://opentelemetry.io/docs/instrumentation/go/)
+- [Dapr Documentation](https://docs.dapr.io/)
+- [Dapr Go SDK](https://github.com/dapr/go-sdk)
 - [Structured Logging Best Practices](https://blog.treasuredata.com/post/the-power-of-structured-logging/)
 - [Distributed Tracing Concepts](https://opentelemetry.io/docs/concepts/observability-primer/)
 

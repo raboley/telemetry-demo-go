@@ -16,10 +16,10 @@ import (
 
 type SubscriberRepository interface {
 	Create(ctx context.Context, subscriber *models.Subscriber) error
-	GetByID(ctx context.Context, id uuid.UUID) (*models.Subscriber, error)
+	GetByID(ctx context.Context, id string) (*models.Subscriber, error)
 	GetAll(ctx context.Context) ([]*models.Subscriber, error)
 	Update(ctx context.Context, subscriber *models.Subscriber) error
-	Delete(ctx context.Context, id uuid.UUID) error
+	Delete(ctx context.Context, id string) error
 }
 
 type InMemorySubscriberRepository struct {
@@ -59,10 +59,14 @@ func (r *InMemorySubscriberRepository) Create(ctx context.Context, subscriber *m
 	return nil
 }
 
-func (r *InMemorySubscriberRepository) GetByID(ctx context.Context, id uuid.UUID) (*models.Subscriber, error) {
+func (r *InMemorySubscriberRepository) GetByID(ctx context.Context, id string) (*models.Subscriber, error) {
+	parsedID, err := uuid.Parse(id)
+	if err != nil {
+		return nil, fmt.Errorf("invalid UUID format: %w", err)
+	}
 	ctx, span := r.tracer.Start(ctx, "subscriber.repository.get_by_id",
 		trace.WithAttributes(
-			attribute.String("subscriber.id", id.String()),
+			attribute.String("subscriber.id", id),
 			attribute.String("operation", "database.read"),
 		))
 	defer span.End()
@@ -72,7 +76,7 @@ func (r *InMemorySubscriberRepository) GetByID(ctx context.Context, id uuid.UUID
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	subscriber, exists := r.subscribers[id]
+	subscriber, exists := r.subscribers[parsedID]
 	if !exists {
 		span.RecordError(fmt.Errorf("subscriber not found"))
 		return nil, fmt.Errorf("subscriber with ID %s not found", id)
@@ -130,10 +134,14 @@ func (r *InMemorySubscriberRepository) Update(ctx context.Context, subscriber *m
 	return nil
 }
 
-func (r *InMemorySubscriberRepository) Delete(ctx context.Context, id uuid.UUID) error {
+func (r *InMemorySubscriberRepository) Delete(ctx context.Context, id string) error {
+	parsedID, err := uuid.Parse(id)
+	if err != nil {
+		return fmt.Errorf("invalid UUID format: %w", err)
+	}
 	ctx, span := r.tracer.Start(ctx, "subscriber.repository.delete",
 		trace.WithAttributes(
-			attribute.String("subscriber.id", id.String()),
+			attribute.String("subscriber.id", id),
 			attribute.String("operation", "database.write"),
 		))
 	defer span.End()
@@ -143,12 +151,12 @@ func (r *InMemorySubscriberRepository) Delete(ctx context.Context, id uuid.UUID)
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	if _, exists := r.subscribers[id]; !exists {
+	if _, exists := r.subscribers[parsedID]; !exists {
 		span.RecordError(fmt.Errorf("subscriber not found"))
 		return fmt.Errorf("subscriber with ID %s not found", id)
 	}
 
-	delete(r.subscribers, id)
+	delete(r.subscribers, parsedID)
 	span.SetAttributes(attribute.Bool("success", true))
 	return nil
 }
