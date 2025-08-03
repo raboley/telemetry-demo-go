@@ -1,8 +1,10 @@
 package handlers
 
 import (
+	"bytes"
+	"io"
 	"net/http"
-	"strconv"
+	"strconv" 
 	"time"
 	
 	"github.com/gin-gonic/gin"
@@ -33,13 +35,18 @@ func NewV0Handler(store *store.MemoryStore) *V0Handler {
 func (h *V0Handler) CreateSubscriber(c *gin.Context) {
 	start := time.Now()
 	
+	// Read and preserve raw body for logging
+	body, _ := io.ReadAll(c.Request.Body)
+	c.Request.Body = io.NopCloser(bytes.NewBuffer(body))
+	
 	var req models.Subscriber
 	if err := c.ShouldBindJSON(&req); err != nil {
 		h.logger.WithFields(logrus.Fields{
-			"method":    "POST",
-			"endpoint":  "/v0/subscribers",
-			"error":     err.Error(),
-			"duration":  time.Since(start),
+			"method":      "POST",
+			"endpoint":    "/v0/subscribers",
+			"error":       err.Error(),
+			"raw_body":    string(body),
+			"duration":    time.Since(start),
 		}).Error("Invalid request body")
 		
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})

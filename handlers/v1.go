@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"time"
@@ -51,17 +53,25 @@ func (h *V1Handler) CreateSubscriber(c *gin.Context) {
 		attribute.String("component", "http_handler"),
 	)
 	
+	// Read and preserve raw body for logging
+	body, _ := io.ReadAll(c.Request.Body)
+	c.Request.Body = io.NopCloser(bytes.NewBuffer(body))
+	
 	var req models.Subscriber
 	if err := c.ShouldBindJSON(&req); err != nil {
 		// Mark span as error and add error details
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "Invalid request body")
-		span.SetAttributes(attribute.String("error.type", "validation_error"))
+		span.SetAttributes(
+			attribute.String("error.type", "validation_error"),
+			attribute.String("request.body", string(body)),
+		)
 		
 		h.logger.WithFields(logrus.Fields{
 			"method":    "POST",
 			"endpoint":  "/v1/subscribers",
 			"error":     err.Error(),
+			"raw_body":  string(body),
 			"duration":  time.Since(start),
 			"trace_id":  span.SpanContext().TraceID().String(),
 		}).Error("Invalid request body")
